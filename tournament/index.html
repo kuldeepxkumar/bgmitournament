@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tournament Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{padding:28px;max-width:720px;margin:0 auto;overflow-y:auto;height:auto;}
+  h1{font-family:var(--font-display);font-size:26px;margin:0 0 4px;}
+  .sub{color:var(--ink-dim);font-size:13px;margin-bottom:24px;}
+  .card{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:16px;}
+  .card h2{font-family:var(--font-display);font-size:16px;margin:0 0 12px;color:var(--accent);}
+  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .row input{flex:1;min-width:160px;}
+  .idsOut{
+    font-family:var(--font-mono);font-size:12px;color:var(--accent-2);
+    background:var(--bg-elevated);border:1px solid var(--line);border-radius:6px;
+    padding:12px;margin-top:14px;word-break:break-all;line-height:1.6;
+  }
+  .links{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .links a{
+    display:inline-block;padding:10px 14px;background:rgba(23,201,209,0.12);
+    border:1px solid var(--accent);border-radius:6px;color:var(--accent);
+    font-family:var(--font-mono);font-size:13px;text-decoration:none;
+    transition:background .2s;
+  }
+  .links a:hover{background:var(--accent);color:#041215;}
+</style>
+</head>
+<body>
+
+<h1>Tournament Setup</h1>
+<div class="sub">Create the tid / rid / mid / setId chain once — reuse the generated overlay link in OBS all tournament long.</div>
+
+<div class="card">
+  <h2>1. Tournament</h2>
+  <div class="row">
+    <input id="tName" placeholder="Tournament name e.g. BGMI Championship 2026">
+    <button class="primary" id="createT">Create Tournament</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. Round</h2>
+  <div class="row">
+    <input id="tidIn" placeholder="Tournament ID (tid)">
+    <input id="rName" placeholder="Round name e.g. Grand Finals">
+    <button class="primary" id="createR">Create Round</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>3. Match</h2>
+  <div class="row">
+    <input id="tidIn2" placeholder="tid">
+    <input id="ridIn" placeholder="rid">
+    <input id="mName" placeholder="Match name e.g. Match 1 - Erangel">
+    <button class="primary" id="createM">Create Match</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>4. Set (Ranking Table & Teams)</h2>
+  <div class="row">
+    <input id="tidIn3" placeholder="tid">
+    <input id="ridIn2" placeholder="rid">
+    <input id="midIn" placeholder="mid">
+    <input id="teamCount" placeholder="How many teams? e.g. 16 or 25" type="number" value="16">
+    <button class="primary" id="createSet">Create Set + Teams</button>
+  </div>
+  <div class="idsOut" id="finalOut" style="display:none;"></div>
+  <div class="links" id="finalLinks"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+function show(id, text) { document.getElementById(id).textContent = text; }
+
+document.getElementById('createT').onclick = () => {
+  const name = document.getElementById('tName').value.trim() || 'Untitled Tournament';
+  const ref = db.ref('tournaments').push({ name });
+  const tid = ref.key;
+  alert(`Tournament created successfully!\ntid: ${tid}`);
+  document.getElementById('tidIn').value = tid;
+  document.getElementById('tidIn2').value = tid;
+  document.getElementById('tidIn3').value = tid;
+};
+
+document.getElementById('createR').onclick = () => {
+  const tid = document.getElementById('tidIn').value.trim();
+  const name = document.getElementById('rName').value.trim() || 'Untitled Round';
+  if (!tid) return alert('Enter Tournament ID (tid) first.');
+  const ref = db.ref(`tournaments/${tid}/rounds`).push({ name });
+  const rid = ref.key;
+  alert(`Round created successfully!\nrid: ${rid}`);
+  document.getElementById('ridIn').value = rid;
+  document.getElementById('ridIn2').value = rid;
+};
+
+document.getElementById('createM').onclick = () => {
+  const tid = document.getElementById('tidIn2').value.trim();
+  const rid = document.getElementById('ridIn').value.trim();
+  const name = document.getElementById('mName').value.trim() || 'Untitled Match';
+  if (!tid || !rid) return alert('Enter tid and rid first.');
+  const ref = db.ref(`tournaments/${tid}/rounds/${rid}/matches`).push({ name });
+  const mid = ref.key;
+  alert(`Match created successfully!\nmid: ${mid}`);
+  document.getElementById('midIn').value = mid;
+};
+
+document.getElementById('createSet').onclick = () => {
+  const tid = document.getElementById('tidIn3').value.trim();
+  const rid = document.getElementById('ridIn2').value.trim();
+  const mid = document.getElementById('midIn').value.trim();
+  const count = Number(document.getElementById('teamCount').value) || 16;
+  if (!tid || !rid || !mid) return alert('Enter tid, rid, and mid first.');
+
+  const setsRef = db.ref(`tournaments/${tid}/rounds/${rid}/matches/${mid}/sets`);
+  const setRef = setsRef.push();
+  const setId = setRef.key;
+
+  const teams = {};
+  for (let i = 1; i <= count; i++) {
+    const key = db.ref().push().key;
+    teams[key] = {
+      name: `Team ${i}`,
+      alive: 4,
+      kills: 0,
+      placementPoints: 0,
+      slot: i
+    };
+  }
+
+  setRef.set({ meta: { matchLabel: 'MATCH 1', autoFinal4: true, autoEndMatch: true }, teams }).then(() => {
+    // Generate proper relative URLs regardless of current filename
+    const basePath = location.pathname.substring(0, location.pathname.lastIndexOf('/') + 1);
+    const overlayUrl = `${location.origin}${basePath}live_ranking.html?tid=${tid}&rid=${rid}&mid=${mid}&setId=${setId}`;
+    const adminUrl = `${location.origin}${basePath}admin.html?tid=${tid}&rid=${rid}&mid=${mid}&setId=${setId}`;
+    
+    document.getElementById('finalOut').style.display = 'block';
+    show('finalOut', `tid: ${tid}\nrid: ${rid}\nmid: ${mid}\nsetId: ${setId}`);
+    document.getElementById('finalLinks').innerHTML = `
+      <a href="${adminUrl}" target="_blank">👉 Open Admin Control Room</a>
+      <a href="${overlayUrl}" target="_blank">📺 Open Live Ranking Overlay (OBS Browser Source)</a>
+    `;
+  });
+};
+</script>
+</body>
+</html>

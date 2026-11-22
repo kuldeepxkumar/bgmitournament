@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Control Room — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+body{ padding:24px; max-width:1180px; margin:0 auto; }
+
+/* ---- top bar ---- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:14px; margin-bottom:20px;
+}
+.title-block{ display:flex; align-items:center; gap:12px; }
+.live-dot{
+  display:inline-flex; align-items:center; gap:6px;
+  color:var(--danger); font-family:var(--font-mono); font-size:11px; letter-spacing:.1em;
+  font-weight:700;
+}
+.live-dot::before{
+  content:''; width:8px; height:8px; border-radius:50%; background:var(--danger);
+  box-shadow:0 0 8px var(--danger); animation:pulse 1.4s infinite;
+}
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+h1{ font-family:var(--font-display); font-size:28px; font-weight:700; margin:2px 0 0; letter-spacing:.02em; }
+
+.stat-strip{
+  display:flex; gap:10px; background:var(--bg-panel); border:1px solid var(--line);
+  border-radius:var(--radius); padding:10px 16px;
+}
+.stat{ text-align:center; padding:0 14px; }
+.stat b{ display:block; font-family:var(--font-display); font-size:22px; }
+.stat span{ font-family:var(--font-mono); font-size:10px; color:var(--ink-dim); letter-spacing:.08em; text-transform:uppercase; }
+.stat.teams b{ color:var(--accent); }
+.stat.alive b{ color:var(--success); }
+.stat.elim b{ color:var(--danger); }
+.stat.kills b{ color:var(--accent-2); }
+
+.actions-row{ display:flex; gap:10px; align-items:center; }
+.badge-live{
+  display:flex; align-items:center; gap:6px; padding:9px 16px; border-radius:var(--radius-sm);
+  background:linear-gradient(180deg,#f1584f,#c4342c); border:1px solid #8f241e; color:#fff;
+  font-family:var(--font-display); font-weight:700; letter-spacing:.05em; font-size:13px;
+}
+.badge-live::before{ content:''; width:7px; height:7px; border-radius:50%; background:#fff; }
+
+/* ---- id bar ---- */
+.idbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; font-family:var(--font-mono); }
+.idbar input{ flex:1; min-width:150px; }
+
+.overlay-box{
+  display:none; margin-bottom:18px; padding:10px 14px; background:var(--bg-panel);
+  border:1px solid var(--line); border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:12px;
+}
+.overlay-box a{ word-break:break-all; }
+
+/* ---- layout: teams + sidebar ---- */
+.layout{ display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; }
+@media (max-width:880px){ .layout{ grid-template-columns:1fr; } }
+
+.search-row{ display:flex; gap:10px; margin-bottom:14px; }
+.search-row input{ flex:1; }
+.filter-btn{ padding:8px 16px; }
+.filter-btn.active{ background:var(--bg-elevated); border-color:var(--accent); color:var(--accent); }
+
+.toolbar{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.status-msg{ font-family:var(--font-mono); font-size:12px; color:var(--accent); margin-left:4px; }
+
+/* ---- team card ---- */
+.team-card{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px 18px; margin-bottom:14px; position:relative; overflow:hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.team-card::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--success);
+}
+.team-card.eliminated::before{ background:var(--danger); }
+.team-card.eliminated{ background:linear-gradient(90deg, rgba(239,68,68,.08), transparent 40%), var(--bg-panel); opacity:0.85; }
+
+.card-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.rank-chip{
+  font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--accent);
+  background:var(--bg-elevated); border:1px solid var(--line); border-radius:6px; padding:4px 10px; min-width:34px; text-align:center;
+}
+.slot-badge{
+  display:flex; align-items:center; gap:5px;
+  font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.04em;
+  background:rgba(168,85,247,.14); border:1px solid #a855f7; color:#d8b4fe;
+  border-radius:6px; padding:3px 8px 3px 6px;
+}
+.slot-badge::before{ content:'SLOT'; color:#a855f7; font-size:9px; letter-spacing:.08em; }
+.slot-badge input{
+  width:30px; background:transparent; border:none; color:#f3e8ff; font-family:var(--font-mono);
+  font-weight:700; font-size:13px; text-align:center; padding:0;
+}
+.slot-badge input:focus{ box-shadow:none; }
+
+.logo-upload{
+  position:relative; width:34px; height:34px; border-radius:7px; overflow:hidden;
+  background:var(--bg-elevated); border:1px solid var(--line); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  transition:border-color .15s ease;
+}
+.logo-upload:hover{ border-color:var(--accent); }
+.logo-preview{ width:100%; height:100%; object-fit:cover; }
+.logo-placeholder{ color:var(--ink-dim); font-size:16px; font-weight:700; }
+.logo-spinner{
+  position:absolute; inset:0; background:rgba(11,16,22,.75);
+  display:flex; align-items:center; justify-content:center;
+}
+.logo-spinner::before{
+  content:''; width:14px; height:14px; border-radius:50%;
+  border:2px solid var(--line); border-top-color:var(--accent);
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.card-top .place-input{ width:46px; text-align:center; }
+.name-input{ font-family:var(--font-display); font-weight:700; font-size:16px; flex:1; min-width:120px; }
+
+.elim-pill{
+  font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.05em;
+  padding:5px 10px; border-radius:20px; border:1px solid var(--danger); color:var(--danger); background:rgba(239,68,68,.08);
+  display:flex; align-items:center; gap:5px;
+}
+.in-pill{
+  font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.05em;
+  padding:5px 10px; border-radius:20px; border:1px solid var(--success); color:var(--success); background:rgba(51,199,102,.08);
+  display:flex; align-items:center; gap:5px; cursor:pointer;
+}
+
+.stepper{ display:flex; align-items:center; gap:6px; }
+.stepper button{ padding:4px 10px; font-size:15px; line-height:1; }
+.stepper input{ width:44px; text-align:center; font-family:var(--font-mono); font-weight:700; }
+
+.quick-kills{ display:flex; gap:4px; align-items:center; margin-left:6px; }
+.quick-kill-btn{
+  background:rgba(255,176,46,0.15); border:1px solid var(--accent-2); color:var(--accent-2);
+  padding:3px 8px; font-size:11px; font-family:var(--font-mono); font-weight:700; border-radius:4px; cursor:pointer;
+}
+.quick-kill-btn:hover{ background:var(--accent-2); color:#000; }
+
+.card-mid{ display:flex; align-items:center; gap:22px; margin-top:12px; flex-wrap:wrap; }
+.field-label{ font-family:var(--font-mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+
+.pts-pill{
+  font-family:var(--font-mono); font-weight:700; padding:5px 14px; border-radius:20px;
+  background:rgba(255,176,46,.12); border:1px solid var(--accent-2); color:var(--accent-2); font-size:13px;
+}
+
+.card-bottom{ display:flex; gap:10px; margin-top:14px; }
+.card-bottom button{ font-size:12px; padding:7px 14px; }
+
+/* ---- sidebar ---- */
+.side-panel{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px;
+}
+.side-panel h3{
+  font-family:var(--font-mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-dim); margin:0 0 14px;
+}
+.auto-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); }
+.auto-row:last-child{ border-bottom:none; }
+.auto-row b{ font-family:var(--font-display); font-size:14px; display:block; margin-bottom:3px; }
+.auto-row p{ font-size:12px; color:var(--ink-dim); margin:0; max-width:190px; }
+
+.switch{ position:relative; width:40px; height:22px; flex-shrink:0; }
+.switch input{ opacity:0; width:0; height:0; }
+.slider{
+  position:absolute; inset:0; background:var(--bg-elevated); border:1px solid var(--line);
+  border-radius:20px; cursor:pointer; transition:.2s;
+}
+.slider::before{
+  content:''; position:absolute; height:16px; width:16px; left:2px; top:2px; background:var(--ink-dim);
+  border-radius:50%; transition:.2s;
+}
+.switch input:checked + .slider{ background:rgba(23,201,209,.25); border-color:var(--accent); }
+.switch input:checked + .slider::before{ transform:translateX(18px); background:var(--accent); }
+
+.mini-stats{ margin-top:18px; display:grid; gap:10px; }
+.mini-stat{
+  background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:12px 14px; display:flex; align-items:center; gap:12px;
+}
+.mini-stat b{ font-family:var(--font-display); font-size:22px; display:block; }
+.mini-stat span{ font-family:var(--font-mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="title-block">
+    <div>
+      <div class="live-dot">LIVE CONTROL ROOM</div>
+      <h1 id="matchTitle">MATCH · ERANGEL</h1>
+    </div>
+  </div>
+
+  <div class="stat-strip">
+    <div class="stat teams"><b id="statTeams">0</b><span>Teams</span></div>
+    <div class="stat alive"><b id="statAlive">0</b><span>Alive</span></div>
+    <div class="stat elim"><b id="statElim">0</b><span>Eliminated</span></div>
+    <div class="stat kills"><b id="statKills">0</b><span>Total Kills</span></div>
+  </div>
+
+  <div class="actions-row">
+    <span class="badge-live">LIVE</span>
+    <button class="ghost" id="reloadBtn" title="Reload">⟳</button>
+  </div>
+</div>
+
+<div class="idbar">
+  <input id="tid" placeholder="Tournament ID (tid)">
+  <input id="rid" placeholder="Round ID (rid)">
+  <input id="mid" placeholder="Match ID (mid)">
+  <input id="setId" placeholder="Set ID (setId)">
+  <button class="primary" id="loadBtn">Load / Connect</button>
+</div>
+
+<div class="overlay-box" id="overlayLinkBox">
+  Overlay URL: <a id="overlayLink" href="#" target="_blank"></a>
+  <button class="ghost" id="copyLinkBtn" style="margin-left:8px;padding:4px 10px;font-size:12px;">Copy</button>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="search-row">
+      <input id="searchTeams" placeholder="Search teams...">
+      <button class="ghost filter-btn active" data-filter="all">All</button>
+      <button class="ghost filter-btn" data-filter="alive">Alive</button>
+      <button class="ghost filter-btn" data-filter="out">Out</button>
+    </div>
+
+    <div class="toolbar">
+      <input id="matchLabel" placeholder="Match label e.g. MATCH 3" style="width:180px;">
+      <button class="ghost" id="setLabelBtn">Set Label</button>
+      <button class="primary" id="addTeamBtn">+ Add Team</button>
+      <button class="danger" id="resetBtn">Reset All Alive/Kills</button>
+      <span class="status-msg" id="status"></span>
+    </div>
+
+    <div id="teamCards"><div style="color:var(--ink-dim); padding:20px 0;">Load a set to begin.</div></div>
+  </div>
+
+  <div class="side-panel">
+    <h3>Smart Automation</h3>
+    <div class="auto-row">
+      <div>
+        <b>Auto-Show Final 4</b>
+        <p>Swaps live ranking to top horizontal bar at ≤4 alive</p>
+      </div>
+      <label class="switch"><input type="checkbox" id="autoFinal4" checked><span class="slider"></span></label>
+    </div>
+    <div class="auto-row">
+      <div>
+        <b>Auto-End Match</b>
+        <p>Sets winner &amp; ends match when 1 team remains</p>
+      </div>
+      <label class="switch"><input type="checkbox" id="autoEndMatch"><span class="slider"></span></label>
+    </div>
+
+    <h3 style="margin-top:22px;">Match Stats</h3>
+    <div class="mini-stats">
+      <div class="mini-stat"><b id="miniTeams">0</b><span>Teams Alive</span></div>
+      <div class="mini-stat"><b id="miniKills">0</b><span>Total Kills</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+let current = null; // {tid, rid, mid, setId}
+let allTeams = {};
+let currentFilter = 'all';
+const statusEl = document.getElementById('status');
+
+function flash(msg) {
+  statusEl.textContent = msg;
+  setTimeout(() => statusEl.textContent = '', 1500);
+}
+
+function getUrlIds() {
+  const p = new URLSearchParams(window.location.search);
+  return {
+    tid: p.get('tid') || '',
+    rid: p.get('rid') || '',
+    mid: p.get('mid') || '',
+    setId: p.get('setId') || ''
+  };
+}
+
+function teamsRef(tid, rid, mid, setId) {
+  return db.ref(`${setPath(tid, rid, mid, setId)}/teams`);
+}
+
+function metaRef(tid, rid, mid, setId) {
+  return db.ref(`${setPath(tid, rid, mid, setId)}/meta`);
+}
+
+(function prefill() {
+  const ids = getUrlIds();
+  if (ids.tid) document.getElementById('tid').value = ids.tid;
+  if (ids.rid) document.getElementById('rid').value = ids.rid;
+  if (ids.mid) document.getElementById('mid').value = ids.mid;
+  if (ids.setId) document.getElementById('setId').value = ids.setId;
+  if (ids.tid && ids.rid && ids.mid && ids.setId) {
+    current = ids;
+    connect();
+  }
+})();
+
+document.getElementById('loadBtn').onclick = () => {
+  const tid = document.getElementById('tid').value.trim();
+  const rid = document.getElementById('rid').value.trim();
+  const mid = document.getElementById('mid').value.trim();
+  const setId = document.getElementById('setId').value.trim();
+  if (!tid || !rid || !mid || !setId) { alert('Fill in all four IDs.'); return; }
+  current = { tid, rid, mid, setId };
+  connect();
+};
+document.getElementById('reloadBtn').onclick = () => { if (current) connect(); };
+
+function connect() {
+  const { tid, rid, mid, setId } = current;
+  const overlayUrl = `${location.origin}${location.pathname.replace('admin.html','live_ranking.html')}?tid=${tid}&rid=${rid}&mid=${mid}&setId=${setId}`;
+  document.getElementById('overlayLinkBox').style.display = 'block';
+  const linkEl = document.getElementById('overlayLink');
+  linkEl.href = overlayUrl;
+  linkEl.textContent = overlayUrl;
+  document.getElementById('copyLinkBtn').onclick = () => {
+    navigator.clipboard.writeText(overlayUrl);
+    flash('Link copied');
+  };
+
+  teamsRef(tid, rid, mid, setId).on('value', snap => {
+    allTeams = snap.val() || {};
+    renderTeams();
+  });
+
+  metaRef(tid, rid, mid, setId).on('value', snap => {
+    const meta = snap.val() || {};
+    if (meta.matchLabel) {
+      document.getElementById('matchLabel').value = meta.matchLabel;
+      document.getElementById('matchTitle').textContent = meta.matchLabel;
+    }
+    if (meta.autoFinal4 !== undefined) {
+      document.getElementById('autoFinal4').checked = Boolean(meta.autoFinal4);
+    }
+    if (meta.autoEndMatch !== undefined) {
+      document.getElementById('autoEndMatch').checked = Boolean(meta.autoEndMatch);
+    }
+  });
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderTeams();
+  });
+});
+document.getElementById('searchTeams').addEventListener('input', renderTeams);
+
+function renderTeams() {
+  const container = document.getElementById('teamCards');
+  const search = document.getElementById('searchTeams').value.trim().toLowerCase();
+  const entries = Object.entries(allTeams).filter(([key, t]) => {
+    const alive = Number(t.alive ?? 0);
+    if (currentFilter === 'alive' && alive <= 0) return false;
+    if (currentFilter === 'out' && alive > 0) return false;
+    if (search && !(t.name || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  entries.sort((a, b) => {
+    const sa = a[1].slot, sb = b[1].slot;
+    const na = sa === undefined || sa === null || sa === '' ? Infinity : parseFloat(sa);
+    const nb = sb === undefined || sb === null || sb === '' ? Infinity : parseFloat(sb);
+    if (isNaN(na) && isNaN(nb)) return String(sa ?? '').localeCompare(String(sb ?? ''));
+    if (isNaN(na)) return 1;
+    if (isNaN(nb)) return -1;
+    return na - nb;
+  });
+
+  const allArr = Object.values(allTeams);
+  const teamsCount = allArr.length;
+  const aliveCount = allArr.filter(t => Number(t.alive ?? 0) > 0).length;
+  const elimCount = teamsCount - aliveCount;
+  const totalKills = allArr.reduce((s, t) => s + Number(t.kills ?? 0), 0);
+  document.getElementById('statTeams').textContent = teamsCount;
+  document.getElementById('statAlive').textContent = aliveCount;
+  document.getElementById('statElim').textContent = elimCount;
+  document.getElementById('statKills').textContent = totalKills;
+  document.getElementById('miniTeams').textContent = aliveCount;
+  document.getElementById('miniKills').textContent = totalKills;
+
+  if (entries.length === 0) {
+    container.innerHTML = '<div style="color:var(--ink-dim); padding:20px 0;">No teams match.</div>';
+    return;
+  }
+
+  const sorted = [...entries].sort((a, b) => {
+    const ta = Number(a[1].placementPoints ?? 0) + Number(a[1].kills ?? 0);
+    const tb = Number(b[1].placementPoints ?? 0) + Number(b[1].kills ?? 0);
+    return tb - ta;
+  });
+  const rankMap = {};
+  sorted.forEach(([key], i) => rankMap[key] = i + 1);
+
+  container.innerHTML = entries.map(([key, t]) => {
+    const alive = Number(t.alive ?? 0);
+    const kills = Number(t.kills ?? 0);
+    const pp = Number(t.placementPoints ?? 0);
+    const total = pp + kills;
+    const isElim = alive <= 0;
+    return `
+    <div class="team-card ${isElim ? 'eliminated' : ''}" data-key="${key}">
+      <div class="card-top">
+        <span class="rank-chip" title="Current live rank">#${rankMap[key]}</span>
+        <span class="slot-badge" title="Slot number">
+          <input value="${escapeAttr(t.slot ?? '')}" data-field="slot" placeholder="—">
+        </span>
+        <label class="logo-upload" title="Upload team logo">
+          ${t.logo
+            ? `<img class="logo-preview" src="${t.logo}" alt="">`
+            : `<span class="logo-placeholder">＋</span>`}
+          <input type="file" accept="image/*" class="logo-input" data-action="upload-logo" hidden>
+          <span class="logo-spinner" style="display:none;"></span>
+        </label>
+        <input class="name-input" value="${escapeAttr(t.name || '')}" data-field="name">
+        ${isElim
+          ? `<span class="elim-pill">✕ ELIMINATED</span>`
+          : `<span class="in-pill" data-action="eliminate">● IN</span>`}
+        <button class="ghost restore-btn" data-action="restore" style="${isElim ? '' : 'display:none;'} font-size:12px; padding:6px 12px;">Restore</button>
+      </div>
+      <div class="card-mid">
+        <div>
+          <div class="field-label">Alive Players</div>
+          <div class="stepper">
+            <button class="ghost step" data-field="alive" data-delta="-1">-</button>
+            <input data-field="alive" value="${alive}">
+            <button class="ghost step" data-field="alive" data-delta="1">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Kills</div>
+          <div class="stepper">
+            <button class="ghost step" data-field="kills" data-delta="-1">-</button>
+            <input data-field="kills" value="${kills}">
+            <button class="ghost step" data-field="kills" data-delta="1">+</button>
+            <div class="quick-kills">
+              <button class="quick-kill-btn" data-addkill="1">+1</button>
+              <button class="quick-kill-btn" data-addkill="2">+2</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Placement Pts</div>
+          <input data-field="placementPoints" value="${pp}" style="width:60px; text-align:center;">
+        </div>
+        <div>
+          <div class="field-label">Total</div>
+          <span class="pts-pill">${total} pts</span>
+        </div>
+      </div>
+      <div class="card-bottom">
+        <button class="ghost" data-action="eliminate-toggle">${isElim ? 'Mark In' : 'Eliminate'}</button>
+        <button class="danger remove-btn" data-action="remove">Remove Team</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('input[data-field]').forEach(inp => {
+    inp.addEventListener('change', () => onFieldChange(inp));
+  });
+  container.querySelectorAll('button.step').forEach(btn => {
+    btn.addEventListener('click', () => onStep(btn));
+  });
+  container.querySelectorAll('button[data-addkill]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const delta = Number(btn.dataset.addkill);
+      const key = rowKey(btn);
+      onQuickKill(key, delta);
+    });
+  });
+  container.querySelectorAll('[data-action="eliminate-toggle"]').forEach(btn => {
+    btn.addEventListener('click', () => onEliminateToggle(btn));
+  });
+  container.querySelectorAll('[data-action="restore"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = rowKey(btn);
+      const { tid, rid, mid, setId } = current;
+      teamsRef(tid, rid, mid, setId).child(key).update({ alive: 4 });
+    });
+  });
+  container.querySelectorAll('[data-action="remove"]').forEach(btn => {
+    btn.addEventListener('click', () => onRemove(btn));
+  });
+  container.querySelectorAll('[data-action="upload-logo"]').forEach(inp => {
+    inp.addEventListener('change', () => onLogoUpload(inp));
+  });
+}
+
+function onQuickKill(key, delta) {
+  const { tid, rid, mid, setId } = current;
+  const ref = teamsRef(tid, rid, mid, setId).child(key).child('kills');
+  ref.once('value').then(snap => {
+    const newVal = Math.max(0, Number(snap.val() || 0) + delta);
+    ref.set(newVal);
+    flash(`+${delta} Kill!`);
+  });
+}
+
+function onLogoUpload(inp) {
+  const file = inp.files && inp.files[0];
+  if (!file) return;
+  const key = rowKey(inp);
+  const { tid, rid, mid, setId } = current;
+  const label = inp.closest('.logo-upload');
+  const spinner = label.querySelector('.logo-spinner');
+  spinner.style.display = 'flex';
+
+  resizeImageToDataUrl(file, 64, 64, 0.72)
+    .then(dataUrl => teamsRef(tid, rid, mid, setId).child(key).update({ logo: dataUrl }))
+    .then(() => flash('Logo saved'))
+    .catch(err => { alert('Logo upload failed: ' + err.message); })
+    .finally(() => { spinner.style.display = 'none'; });
+}
+
+function resizeImageToDataUrl(file, maxW, maxH, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.onload = () => {
+      img.onerror = () => reject(new Error('Could not decode image'));
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = maxW; canvas.height = maxH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, maxW, maxH);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function rowKey(el) { return el.closest('.team-card').dataset.key; }
+
+function onFieldChange(inp) {
+  const key = rowKey(inp);
+  const field = inp.dataset.field;
+  let value = inp.value;
+  if (field !== 'name' && field !== 'slot') value = Number(value) || 0;
+  const { tid, rid, mid, setId } = current;
+  teamsRef(tid, rid, mid, setId).child(key).update({ [field]: value });
+  flash('Saved');
+}
+
+function onStep(btn) {
+  const key = rowKey(btn);
+  const field = btn.dataset.field;
+  const delta = Number(btn.dataset.delta);
+  const { tid, rid, mid, setId } = current;
+  const ref = teamsRef(tid, rid, mid, setId).child(key).child(field);
+  ref.once('value').then(snap => {
+    const newVal = Math.max(0, Number(snap.val() || 0) + delta);
+    ref.set(newVal);
+  });
+}
+
+function onEliminateToggle(btn) {
+  const key = rowKey(btn);
+  const { tid, rid, mid, setId } = current;
+  const t = allTeams[key] || {};
+  const alive = Number(t.alive ?? 0);
+  const newAlive = alive > 0 ? 0 : 4;
+  teamsRef(tid, rid, mid, setId).child(key).update({ alive: newAlive });
+}
+
+function onRemove(btn) {
+  const key = rowKey(btn);
+  if (!confirm('Remove this team?')) return;
+  const { tid, rid, mid, setId } = current;
+  teamsRef(tid, rid, mid, setId).child(key).remove();
+}
+
+document.getElementById('addTeamBtn').onclick = () => {
+  if (!current) { alert('Load a set first.'); return; }
+  const { tid, rid, mid, setId } = current;
+  const name = prompt('Team name?', 'New Team');
+  if (!name) return;
+  teamsRef(tid, rid, mid, setId).push({ name, alive: 4, kills: 0, placementPoints: 0, slot: '' });
+};
+
+document.getElementById('resetBtn').onclick = () => {
+  if (!current) { alert('Load a set first.'); return; }
+  if (!confirm('Reset alive to 4 and kills to 0 for every team?')) return;
+  const { tid, rid, mid, setId } = current;
+  teamsRef(tid, rid, mid, setId).once('value').then(snap => {
+    const val = snap.val() || {};
+    const updates = {};
+    Object.keys(val).forEach(key => {
+      updates[`${key}/alive`] = 4;
+      updates[`${key}/kills`] = 0;
+    });
+    teamsRef(tid, rid, mid, setId).update(updates);
+    flash('Reset done');
+  });
+};
+
+document.getElementById('setLabelBtn').onclick = () => {
+  if (!current) { alert('Load a set first.'); return; }
+  const { tid, rid, mid, setId } = current;
+  const label = document.getElementById('matchLabel').value.trim();
+  metaRef(tid, rid, mid, setId).update({ matchLabel: label });
+  document.getElementById('matchTitle').textContent = label || 'MATCH';
+  flash('Label set');
+};
+
+document.getElementById('autoFinal4').addEventListener('change', e => {
+  if (!current) return;
+  const { tid, rid, mid, setId } = current;
+  metaRef(tid, rid, mid, setId).update({ autoFinal4: e.target.checked });
+});
+document.getElementById('autoEndMatch').addEventListener('change', e => {
+  if (!current) return;
+  const { tid, rid, mid, setId } = current;
+  metaRef(tid, rid, mid, setId).update({ autoEndMatch: e.target.checked });
+});
+
+function escapeAttr(s) {
+  return String(s).replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
